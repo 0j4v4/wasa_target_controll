@@ -1,0 +1,140 @@
+#!/usr/bin/python3
+
+#
+#   wasa target control software
+# 03.2019 o.javakhishvili@fz-juelich.de
+#
+
+from PyQt5 import QtWidgets
+from WASA_GUI import Ui_MainWindow
+from PyQt5 import QtGui
+import sys
+import time
+import epics_processing
+import globals
+
+class mywindow(QtWidgets.QMainWindow):
+    '''
+            main gui class which handles all gui events and logic
+    '''
+    def __init__(self):
+        '''
+            initialisation of gui window and elements
+        '''
+        super(mywindow, self).__init__()
+        self.ui = Ui_MainWindow()
+        self.ui.setupUi(self)
+        self.ui.on_off_BTN.setCheckable(True)                                #sets on/off button to be toggled
+        #self.ui.GROUP_HORISONTAL.setEnabled(False)
+        self.ui.GROUP_VERTICAL.setEnabled(True)                              #enables groupbox
+        self.ui.on_off_BTN.clicked.connect(self.on_off_button_clicked)       #on/off button event handler
+        self.ui.auto_manual_checkbox.stateChanged.connect(self.mode_select_check_changed)   #auto/manual mode select event handler
+        #set button events
+        self.ui.VERTICAL_IN_BEAM_SET_BUTTON.clicked.connect(self.VERTICAL_IN_BEAM_SET_BUTTON_clicked)
+        self.ui.VERTICAL_DELTA_SET_BUTTON.clicked.connect(self.VERTICAL_DELTA_SET_BUTTON_clicked)
+        self.ui.VERTICAL_HOME_SET_BUTTON.clicked.connect(self.VERTICAL_HOME_SET_BUTTON_clicked)
+        #COMMAND BUTTON EVENTS
+        self.ui.MOVE_Y_INBEAM.clicked.connect(self.MOVE_Y_INBEAM_clicked)
+        self.ui.MOVE_Y_OUTBEAM.clicked.connect(self.MOVE_Y_OUTBEAM_clicked)
+        self.ui.MOVE_Y_HOME.clicked.connect(self.MOVE_Y_HOME_clicked)
+        self.epics = epics_processing.PV_epics(gui = self)    #creates new instance of epics processing class and passes self to give access to gui elements
+        self.on_load()              #loads basic configurrations
+        self.ui.auto_manual_checkbox.setChecked(True)       #sets auto/manual mode to manual
+        inst_count = int(self.epics.Read_PV("INSTANCE")) + 1
+
+        self.epics.Write_PV('INSTANCE',str(inst_count))
+        print (str(inst_count))
+        #self.epics.Write_PV("MODE","MANUAL")
+
+    #button press events
+    def MOVE_Y_INBEAM_clicked(self):
+        self.epics.Write_PV('COMMAND',"MOVE_Y_INBEAM")
+
+    def MOVE_Y_OUTBEAM_clicked(self):
+        self.epics.Write_PV('COMMAND',"MOVE_Y_OUTBEAM")
+
+    def MOVE_Y_HOME_clicked(self):
+        self.epics.Write_PV('COMMAND',"MOVE_Y_HOME")
+
+    def VERTICAL_IN_BEAM_SET_BUTTON_clicked(self):
+        if globals.on_state == "ON":
+            value = self.ui.VERTICAL_IN_BEAM_TEXT_IN.text()
+            self.epics.Write_PV('IN_BEAM_Y',value)
+
+    def VERTICAL_DELTA_SET_BUTTON_clicked(self):
+        if globals.on_state == "ON":
+            value = self.ui.VERTICAL_DELTA_TEXT_IN.text()
+            self.epics.Write_PV('DELTA_Y',value)
+
+    def VERTICAL_HOME_SET_BUTTON_clicked(self):
+        if globals.on_state == "ON":
+            value = self.ui.VERTICAL_HOME_TEXT_IN.text()
+            self.epics.Write_PV('HOME_Y',value)
+
+    def mode_select_check_changed(self):
+        if self.ui.auto_manual_checkbox.isChecked():
+            globals.mode = "MANUAL"
+            #self.ui.GROUP_HORISONTAL.setEnabled(True)
+            self.ui.GROUP_VERTICAL.setEnabled(True)
+            self.status_text_update("mode set to -> " + globals.mode)
+            self.epics.Write_PV('MODE', "MANUAL")
+        else:
+            globals.mode = "AUTO"
+            self.epics.Write_PV('MODE', "AUTO")
+            #self.ui.GROUP_HORISONTAL.setEnabled(False)
+            self.ui.GROUP_VERTICAL.setEnabled(False)
+            self.status_text_update("mode set to -> " + globals.mode)
+
+    def on_off_button_clicked(self):
+        if self.ui.on_off_BTN.isChecked():
+            globals.on_state = "ON"
+            if self.ui.comboBox.currentText() == "File":
+                self.load_from_file()
+            else:
+                self.load_from_epics()
+            self.status_text_update("program state set to -> " + str(globals.on_state))
+            self.epics.Write_PV('GUI', globals.on_state)
+            self.ui.on_off_BTN.setText("ON")
+            self.ui.on_off_BTN.setStyleSheet("background-color: green")
+        else:
+            globals.on_state = "OFF"
+            self.status_text_update("program state set to -> " + str(globals.on_state))
+            self.epics.Write_PV('GUI', globals.on_state)
+            self.ui.on_off_BTN.setText("OFF")
+            self.ui.on_off_BTN.setStyleSheet("background-color: None")
+
+    def on_load(self):
+        self.status_text_update("software loaded successfully")
+        self.epics.load_conf()
+
+    def load_from_file(self):
+        self.status_text_update("data loaded from config file")
+        self.ui.VERTICAL_IN_BEAM_TEXT_IN.setText(str(globals.VERT_INBEAM_DEFOULT_VALUE))
+        self.ui.VERTICAL_DELTA_TEXT_IN.setText(str(globals.VERT_DELTA_DEFOULT_VALUE))
+        self.ui.VERTICAL_HOME_TEXT_IN.setText(str(globals.VERT_HOME_DEFOULT_VALUE))
+
+    def load_from_epics(self):
+        self.status_text_update("data loaded from epics values")
+        self.ui.VERTICAL_IN_BEAM_TEXT_IN.setText(self.epics.Read_PV('IN_BEAM_Y'))
+        self.ui.VERTICAL_DELTA_TEXT_IN.setText(self.epics.Read_PV('DELTA_Y'))
+        self.ui.VERTICAL_HOME_TEXT_IN.setText(self.epics.Read_PV('HOME_Y'))
+
+    def status_text_update(self, text = ""):
+        ''' this method helps to manage text in text browser object for status logging. can be called from epics_processing too'''
+        self.ui.textBrowser.append(str(text))
+        self.ui.textBrowser.moveCursor(QtGui.QTextCursor.End)
+
+    def closeEvent(self, event):
+        '''program onclose event sets gui state to off '''
+        globals.on_state = "OFF"
+        self.epics.Write_PV('GUI', globals.on_state)
+        inst_count = int(self.epics.Read_PV("INSTANCE"))
+        self.epics.Write_PV('INSTANCE',str(inst_count-1))
+#
+# =============================================================================
+#
+if __name__ == "__main__":
+    app = QtWidgets.QApplication([])
+    application = mywindow()
+    application.show()
+    sys.exit(app.exec())

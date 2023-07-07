@@ -1,0 +1,29 @@
+!!!run wasa_target_control_gui
+
+when program loads defoult opperating mode is set to "MANUAL"
+recommended steps for operating is:
+1. lounch software 
+2. chose configuration source File/Epics
+3. press ON/OFF button which loads config file and if mode is set to manual it will enable controls 
+4. if one changes some variables in textboxes before sending command to server he/she must press "Set" button for 
+   the textbox which was changed to set the variable
+5. send apropriate command to server pressing buttons on left side of the software "
+6. if loaded defoults are good for experiment just uncheck "auto/manual" selection checkbox to set operating mode to "AUTO"
+
+
+operating mode "AUTO"
+    in this mode server listens to cosy cycles pv variable, if it becomes "1" target will be set to IN_BEAM position
+    if cycles pv variable becomes "0" than target will go to OUT_BEAM position which is set by DELTA_POS textbox
+        OUT_BEAM = IN_BEAM - DELTA_POS
+
+    !!! if gui turns off or you press "on/off" button it will not continue working
+
+operating mode "MANUAL"
+    in this mode software is not listening to cosy cycles. its fully operated by operator 
+    all controls are enabled in software and one can set any position of target manually
+
+    !!! be carefull with "MANUAL" mode
+
+
+Autor: Otari Javakhishvili
+       o.javakhishvili@fz-juelich.de
